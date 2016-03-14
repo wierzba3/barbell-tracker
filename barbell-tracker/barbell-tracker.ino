@@ -12,21 +12,28 @@
 /**
  * the amount of turns of the rotary encoder per cm of the string pulled
  */
-const int CM_PER_TURN = 4.098;
-const int MAX_VALUE = 10000;
-const int MIN_VALUE = -10000;
+const int TICKS_PER_CM = 4.098;
+const int MAX_VALUE = 32767;
+const int MIN_VALUE = -32768;
 
 /**
  * the minimum amount of cm the string must move downwards to be determined as a rep that was started
  */
-int minDistanceDown = 60;
-int minDistanceUp = 10;
+int minDistanceDown = 60 * TICKS_PER_CM;
+int minDistanceUp = 10 * TICKS_PER_CM;
 
 /**
- * Variables that keep track of the most recent minimum and maximum counter value
+ * Variables that keep track of the most recent minimum and maximum counter value, and the time at which they were hit.
  */
 int minValue = MAX_VALUE;
 int maxValue = MIN_VALUE;
+long minTime = 0l;
+long maxTime = 0l;
+
+/**
+ * counter is incremented as the string is pulled, and decremented as the string retracts
+ */
+int counter = 0;
 
 /**
  * true if the string is retracting (the lifter is in the concentric phase of the exercise)
@@ -38,6 +45,10 @@ bool stringRetracting = true;
  */
 bool stringPulling = false;
 
+/**
+ * holds the temporary value read from the quadrature encoder, -1, 0, or 1
+ * where -1 is clockwise, 0 is invalid state, 1 is counter-clockwise
+ */
 int8_t encoderStep;
  
 void setup()
@@ -49,24 +60,35 @@ void setup()
   digitalWrite(ENC_B, HIGH);
   Serial.begin (115200);
   Serial.println("Start");
+  Serial.println("");
+//  Serial.print("MAX_VALUE=");
+//  Serial.println(MAX_VALUE);
+//  Serial.print("MIN_VALUE=");
+//  Serial.println(MIN_VALUE);
 }
  
 void loop()
 {
-  /**
-   * counter is incremented as the string is pulled, and decremented as the string retracts
-   */
-  static int counter = 0;
+
+  //static int counter = 0;
  
   encoderStep = read_encoder();
   if(encoderStep) 
   {
-    Serial.print("Counter value: ");
-    Serial.println(counter, DEC);
+    //Serial.print("Counter value: ");
+    //Serial.println(counter, DEC);
     counter += encoderStep;
 
-    if(counter < minValue) minValue = counter;
-    if(counter > maxValue) maxValue = counter;
+    if(counter < minValue) 
+    {
+      minValue = counter;
+      minTime = millis();
+    }
+    if(counter > maxValue)
+    {
+      maxValue = counter;
+      maxTime = millis();
+    }
     
     //if the string is retracting and we notice an upward movement
     if(stringRetracting && encoderStep > 0)
@@ -89,9 +111,18 @@ void loop()
       //if the distance moved downwards is greater than the minimum required, we conclude that the exercise is now in the downards (concentric) phase
       if(diff > minDistanceDown)
       {
+//        Serial.println("Rep complete");
+//        Serial.print("minValue=");
+//        Serial.println(minValue);
+//        Serial.print("maxValue=");
+//        Serial.println(maxValue);
+//        Serial.println("");
+        calculateVelocity();
         stringRetracting = true;
         stringPulling = false;
-        calculateVelocity(minValue, maxValue, 0l);
+        minValue = MAX_VALUE;
+        maxValue = MIN_VALUE;
+        maxTime = minTime = 0l;
       }
     }
     
@@ -110,8 +141,23 @@ int8_t read_encoder()
   return ( enc_states[( old_AB & 0x0f )]);
 }
 
-void calculateVelocity(int min, int max, long time)
+void calculateVelocity()
 {
   //TODO
+  int distance = maxValue - minValue;
+  long dt = maxTime - minTime;
+  double dtSeconds = dt / 1000.0;
+  int ticksPerSecond = distance / dtSeconds;
+  int cmPerSecond = ticksPerSecond / TICKS_PER_CM;
+
+  Serial.print("distance=");
+  Serial.println(distance);
+  Serial.print("dtSeconds=");
+  Serial.println(dtSeconds);
+  Serial.print("ticksPerSecond=");
+  Serial.println(ticksPerSecond);
+  Serial.print("cmPerSecond=");
+  Serial.println(cmPerSecond);
+  Serial.println("");
 }
 
