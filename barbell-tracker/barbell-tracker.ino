@@ -1,39 +1,63 @@
-/* Rotary encoder read example */
+#include <StandardCplusplus.h>
+#include <vector>
+
 #define ENC_A 14
 #define ENC_B 15
 #define ENC_PORT PINC
 
+using namespace std;
+
+//max and min integer values
+const int MAX_VALUE = 32767;
+const int MIN_VALUE = -32768;
+
 /**
  * TODO
- * keep track of the time at which the string reaches the min/max counter values
- * implement calculateVelocity function
+ * - need to sample velocity for the full range of motion, if we cut out 1 ft from the top and bottom, that cuts out a majority of the data points
+ *    I suggest setting a small minimum threashold of movement (say 5cm) before time points are recorded
+ *    I also suggest setting a minimum distance moved to be considered a rep, and possibly allow the user to specify this.
+ *    
+ * - test lcd display writing
  */
 
 /**
  * the amount of turns of the rotary encoder per cm of the string pulled
  */
 const int TICKS_PER_CM = 4.098;
-const int MAX_VALUE = 32767;
-const int MIN_VALUE = -32768;
+
 
 /**
- * the minimum amount of cm the string must move downwards to be determined as a rep that was started
+ * the minimum amount of cm the string must move in the opposite direction to be determined as switched direction
  */
-int minDistanceDown = 60 * TICKS_PER_CM;
-int minDistanceUp = 10 * TICKS_PER_CM;
+int minDistance = 30 * TICKS_PER_CM;
 
 /**
  * Variables that keep track of the most recent minimum and maximum counter value, and the time at which they were hit.
  */
 int minValue = MAX_VALUE;
 int maxValue = MIN_VALUE;
-long minTime = 0l;
-long maxTime = 0l;
+
+
 
 /**
  * counter is incremented as the string is pulled, and decremented as the string retracts
  */
 int counter = 0;
+/**
+ * the previous counter value at which a time was recorded
+ */
+int lastCounter = 0;
+
+/**
+ * the value at which each time sample is taken.
+ */
+int counterInterval = 10;
+
+/**
+ * A list of time values taken every <counterInterval> counter steps
+ */
+vector<long> timeSteps;
+vector<double> tempVelocity;
 
 /**
  * true if the string is retracting (the lifter is in the concentric phase of the exercise)
@@ -61,17 +85,10 @@ void setup()
   Serial.begin (115200);
   Serial.println("Start");
   Serial.println("");
-//  Serial.print("MAX_VALUE=");
-//  Serial.println(MAX_VALUE);
-//  Serial.print("MIN_VALUE=");
-//  Serial.println(MIN_VALUE);
 }
  
 void loop()
 {
-
-  //static int counter = 0;
- 
   encoderStep = read_encoder();
   if(encoderStep) 
   {
@@ -82,12 +99,15 @@ void loop()
     if(counter < minValue) 
     {
       minValue = counter;
-      minTime = millis();
     }
     if(counter > maxValue)
     {
       maxValue = counter;
-      maxTime = millis();
+      if(counter > lastCounter + counterInterval)
+      {
+        lastCounter = counter;
+        if(stringPulling) timeSteps.push_back(millis());
+      }
     }
     
     //if the string is retracting and we notice an upward movement
@@ -95,12 +115,14 @@ void loop()
     {
       //the distance moved from the bottom
       int diff = counter - minValue;
+      
       //if the distance moved upwards is greater than the minimum required, we conclude the exercise is now in the upwards (eccentric) phase
-      if(diff > minDistanceUp)
+      if(diff > minDistance)
       {
         stringRetracting = false;
         stringPulling = true;
       }
+      
     }
 
     //if the string is being pulled and we notice a downward movement
@@ -109,20 +131,13 @@ void loop()
       //the distance moved from the top
       int diff = maxValue - counter;
       //if the distance moved downwards is greater than the minimum required, we conclude that the exercise is now in the downards (concentric) phase
-      if(diff > minDistanceDown)
+      if(diff > minDistance)
       {
-//        Serial.println("Rep complete");
-//        Serial.print("minValue=");
-//        Serial.println(minValue);
-//        Serial.print("maxValue=");
-//        Serial.println(maxValue);
-//        Serial.println("");
         calculateVelocity();
         stringRetracting = true;
         stringPulling = false;
         minValue = MAX_VALUE;
         maxValue = MIN_VALUE;
-        maxTime = minTime = 0l;
       }
     }
     
@@ -144,20 +159,53 @@ int8_t read_encoder()
 void calculateVelocity()
 {
   //TODO
-  int distance = maxValue - minValue;
-  long dt = maxTime - minTime;
-  double dtSeconds = dt / 1000.0;
-  int ticksPerSecond = distance / dtSeconds;
-  int cmPerSecond = ticksPerSecond / TICKS_PER_CM;
 
-  Serial.print("distance=");
-  Serial.println(distance);
-  Serial.print("dtSeconds=");
-  Serial.println(dtSeconds);
-  Serial.print("ticksPerSecond=");
-  Serial.println(ticksPerSecond);
-  Serial.print("cmPerSecond=");
-  Serial.println(cmPerSecond);
+  Serial.println("Rep:");
+  if(timeSteps.size() > 0)
+  {
+
+    Serial.print("timeSteps values = [");
+    long prev = timeSteps[0];
+    for(int i = 1; i < timeSteps.size(); i++)
+    {
+      Serial.print(timeSteps[i]);
+      if(i != timeSteps.size() - 1) Serial.print(", ");
+    }
+    Serial.println("]");
+
+    Serial.print("dt values = [");
+    prev = timeSteps[0];
+    for(int i = 1; i < timeSteps.size(); i++)
+    {
+      double dt = timeSteps[i] - prev;
+      if(dt == 0) continue;
+      double stepsPerMillis = counterInterval / dt;
+      Serial.print(dt);
+      if(i != timeSteps.size() - 1) Serial.print(", ");
+      prev = timeSteps[i];
+    }
+    Serial.println("]");
+    
+    Serial.print("stepsPerMillis values = [");
+    prev = timeSteps[0];
+    for(int i = 1; i < timeSteps.size(); i++)
+    {
+      double dt = timeSteps[i] - prev;
+      if(dt == 0) continue;
+      double stepsPerMillis = counterInterval / dt;
+      Serial.print(stepsPerMillis);
+      if(i != timeSteps.size() - 1) Serial.print(", ");
+      prev = timeSteps[i];
+    }
+    Serial.println("]");
+
+
+    
+  }
+
   Serial.println("");
+  tempVelocity.clear();
+  timeSteps.clear();
+  lastCounter = 0;
 }
 
