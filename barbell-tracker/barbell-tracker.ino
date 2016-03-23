@@ -20,6 +20,8 @@ const int MIN_VALUE = -32768;
  * - test lcd display writing
  */
 
+int repCounter = 1;
+
 /**
  * the amount of turns of the rotary encoder per cm of the string pulled
  */
@@ -51,13 +53,14 @@ int lastCounter = 0;
 /**
  * the value at which each time sample is taken.
  */
-int counterInterval = 10;
+int counterInterval = 5;
 
 /**
  * A list of time values taken every <counterInterval> counter steps
  */
 vector<long> timeSteps;
-vector<double> tempVelocity;
+vector<double> avgVelocityValues;
+vector<double> maxVelocityValues;
 
 /**
  * true if the string is retracting (the lifter is in the concentric phase of the exercise)
@@ -90,10 +93,11 @@ void setup()
 void loop()
 {
   encoderStep = read_encoder();
+  if(encoderStep == 0) Serial.println("STEP MISSED");
   if(encoderStep) 
   {
-    //Serial.print("Counter value: ");
-    //Serial.println(counter, DEC);
+//    Serial.print("Counter value: ");
+//    Serial.println(counter, DEC);
     counter += encoderStep;
 
     if(counter < minValue) 
@@ -158,53 +162,46 @@ int8_t read_encoder()
 
 void calculateVelocity()
 {
-  //TODO
-
-  Serial.println("Rep:");
+  //remove the last time step, as the lifter will probably stop for breaths at the top, and it may read a new time step much later
+  timeSteps.pop_back();
+  
+  Serial.print("Rep ");
+  Serial.print(repCounter);
+  Serial.println(":");
+  repCounter++;
+  
   if(timeSteps.size() > 0)
   {
 
-    Serial.print("timeSteps values = [");
+    double total = 0, maxVelocity = 0;
     long prev = timeSteps[0];
-    for(int i = 1; i < timeSteps.size(); i++)
-    {
-      Serial.print(timeSteps[i]);
-      if(i != timeSteps.size() - 1) Serial.print(", ");
-    }
-    Serial.println("]");
-
-    Serial.print("dt values = [");
-    prev = timeSteps[0];
+    int cnt = 0;
     for(int i = 1; i < timeSteps.size(); i++)
     {
       double dt = timeSteps[i] - prev;
       if(dt == 0) continue;
-      double stepsPerMillis = counterInterval / dt;
-      Serial.print(dt);
-      if(i != timeSteps.size() - 1) Serial.print(", ");
+      double stepsPerSec = counterInterval * 1000.0 / dt;
+      double metersPerSec = (stepsPerSec / TICKS_PER_CM) / 100.0;
       prev = timeSteps[i];
+      total += metersPerSec;
+      if(metersPerSec > maxVelocity) maxVelocity = metersPerSec;
+      cnt++;
     }
-    Serial.println("]");
     
-    Serial.print("stepsPerMillis values = [");
-    prev = timeSteps[0];
-    for(int i = 1; i < timeSteps.size(); i++)
-    {
-      double dt = timeSteps[i] - prev;
-      if(dt == 0) continue;
-      double stepsPerMillis = counterInterval / dt;
-      Serial.print(stepsPerMillis);
-      if(i != timeSteps.size() - 1) Serial.print(", ");
-      prev = timeSteps[i];
-    }
-    Serial.println("]");
-
-
+    double avgVelocity = total / cnt;
+    Serial.print("Rep complete. Avg velocity = ");
+    Serial.print(avgVelocity);
+    Serial.print(" (m/s)");
+    Serial.print(",\t Peak Velocity: ");
+    Serial.print(maxVelocity);
+    Serial.println(" (m/s)");
+    
+    avgVelocityValues.push_back(avgVelocity);
+    maxVelocityValues.push_back(maxVelocity);
     
   }
 
   Serial.println("");
-  tempVelocity.clear();
   timeSteps.clear();
   lastCounter = 0;
 }
