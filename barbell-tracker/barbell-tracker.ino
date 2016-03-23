@@ -17,7 +17,9 @@ const int MIN_VALUE = -32768;
  * - add a condition for the completion of the rep
  *     before it was if(went down minimum distance), now lets do: if(went down minimum distance OR minimum time has elasped without going up)
  *     this is for the last rep, where the lifter will rack the weight, and the rep will not be calculated because there is no more downward movement
- * - figure out why encoder steps are being missed. Could be the cheap encoder, or possibly too much CPU time spent on code, before the next read.
+ * - figure out why encoder steps are being missed. 
+ *     Could be the cheap encoder, or possibly too much CPU time spent on code, before the next read.
+ *     Try using interupts instead of polling. See example: http://playground.arduino.cc/Main/RotaryEncoders#Example3
  * - test lcd display writing
  */
 
