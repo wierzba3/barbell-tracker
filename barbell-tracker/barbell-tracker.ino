@@ -13,10 +13,11 @@ const int MIN_VALUE = -32768;
 
 /**
  * TODO
- * - need to sample velocity for the full range of motion, if we cut out 1 ft from the top and bottom, that cuts out a majority of the data points
- *    I suggest setting a small minimum threashold of movement (say 5cm) before time points are recorded
- *    I also suggest setting a minimum distance moved to be considered a rep, and possibly allow the user to specify this.
- *    
+ * - change time from millis to micros
+ * - add a condition for the completion of the rep
+ *     before it was if(went down minimum distance), now lets do: if(went down minimum distance OR minimum time has elasped without going up)
+ *     this is for the last rep, where the lifter will rack the weight, and the rep will not be calculated because there is no more downward movement
+ * - figure out why encoder steps are being missed. Could be the cheap encoder, or possibly too much CPU time spent on code, before the next read.
  * - test lcd display writing
  */
 
@@ -125,6 +126,8 @@ void loop()
       {
         stringRetracting = false;
         stringPulling = true;
+        //RESET counter because inaccuraces with encoder readings may cause mis-steps, and possibly negative counter values.
+        counter = 0;
       }
       
     }
