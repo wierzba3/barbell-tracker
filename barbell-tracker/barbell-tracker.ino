@@ -1,5 +1,6 @@
 #include <StandardCplusplus.h>
 #include <vector>
+#include <LiquidCrystal.h>
 
 #define ENC_A 14
 #define ENC_B 15
@@ -7,6 +8,8 @@
 
 using namespace std;
 
+// initialize the library with the numbers of the interface pins
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
 
 /**
@@ -26,7 +29,7 @@ int printCnt = 0;
 
 const int MAX_VALUE = 32767; //max integer value
 const int MIN_VALUE = -32768; //min integer value
-int repCounter = 1;
+int repCounter = 0;
 const int TICKS_PER_CM = 4.098; //the amount of turns of the rotary encoder per cm of the string pulled
 
 
@@ -63,6 +66,8 @@ void setup()
   Serial.begin (115200);
   Serial.println("Start");
   Serial.println("");
+  lcd.begin(16, 2);
+  lcd.clear();
 }
 
 /* returns change in encoder state (-1,0,1) */
@@ -175,10 +180,6 @@ void switchDirection(bool pulling)
 
 void calculateVelocity()
 {
-  //TODO
-  //scan the last <repEndDistance> distance for velocity values less than <minDistance> and truncate the list from that point
-  //this is to remove the time samples between the rep completion and re-rack
-
   //last index of time steps vector
   int lastTimeIdx = timeSteps.size() - 1; 
   
@@ -191,13 +192,13 @@ void calculateVelocity()
   timeSteps.pop_back();
   
 
-
+  repCounter++;
   Serial.println("");
   Serial.println("");
   Serial.print("Rep ");
   Serial.print(repCounter);
   Serial.println(":");
-  repCounter++;
+
   
   if(timeSteps.size() > 0)
   {
@@ -235,6 +236,21 @@ void calculateVelocity()
     Serial.print(",\t Peak Velocity: ");
     Serial.print(maxVelocity);
     Serial.println(" (m/s)");
+
+    //if this is the first rep, clear the initial start message
+    if(repCounter == 1) 
+    {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+    }
+    //1 row can fit 3 reps, if it's the 4th, set the cursor to the second row
+    if(repCounter == 4) lcd.setCursor(0, 1);
+    //the LCD display can hold a maximum of 6
+    if(repCounter <= 6)
+    {
+      lcd.print(avgVelocity);
+      lcd.print(",");
+    }
     
     avgVelocityValues.push_back(avgVelocity);
     maxVelocityValues.push_back(maxVelocity);
