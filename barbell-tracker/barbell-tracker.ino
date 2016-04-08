@@ -4,12 +4,16 @@
 
 #define ENC_A 14
 #define ENC_B 15
+//#define ENC_A 2
+//#define ENC_B 3
+
+
 #define ENC_PORT PINC
 
 using namespace std;
 
 // initialize the library with the numbers of the interface pins
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+LiquidCrystal lcd(12, 11, 5, 4, 9, 10);
 
 
 /**
@@ -20,7 +24,6 @@ LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
  * - figure out why encoder steps are being missed. 
  *     Could be the cheap encoder, or possibly too much CPU time spent on code, before the next read.
  *     Try using interupts instead of polling. See example: http://playground.arduino.cc/Main/RotaryEncoders#Example3
- * - test lcd display writing
  */
 
 
@@ -83,6 +86,8 @@ int8_t read_encoder()
 void loop()
 {
   encoderStep = read_encoder();
+
+  //Code to take samples every pre-determined distance
   if(encoderStep) 
   {
 //    if(debugging)
@@ -190,24 +195,26 @@ void calculateVelocity()
   //samples are taken every ~1cm, so let's remove 2 smaples to be sure
   timeSteps.pop_back();
   timeSteps.pop_back();
-  
-
-  repCounter++;
-  Serial.println("");
-  Serial.println("");
-  Serial.print("Rep ");
-  Serial.print(repCounter);
-  Serial.println(":");
 
   
-  if(timeSteps.size() > 0)
+
+
+
+  
+  if(timeSteps.size() > 1)
   {
+    repCounter++;
+    Serial.println("");
+    Serial.println("");
+    Serial.print("Rep ");
+    Serial.print(repCounter);
+    Serial.println(":");
 
     double total = 0, maxVelocity = 0;
     long prev = timeSteps[0];
     int cnt = 0;
 
-    if(debugging) Serial.print("metersPerSec values: [");
+    if(debugging) Serial.print("micros values: [");
     for(int i = 1; i < timeSteps.size(); i++)
     {
       double dt = timeSteps[i] - prev;
@@ -224,7 +231,7 @@ void calculateVelocity()
       if(metersPerSec > maxVelocity) maxVelocity = metersPerSec;
       cnt++;
 
-      if(debugging) Serial.print(metersPerSec);
+      if(debugging) Serial.print(dt);
       if(debugging && (i != timeSteps.size()-1)) Serial.print(", ");
     }
     if(debugging) Serial.println("]");
