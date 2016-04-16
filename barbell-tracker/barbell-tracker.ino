@@ -33,7 +33,7 @@ int printCnt = 0;
 const int MAX_VALUE = 32767; //max integer value
 const int MIN_VALUE = -32768; //min integer value
 int repCounter = 0;
-const int TICKS_PER_CM = 4.098; //the amount of turns of the rotary encoder per cm of the string pulled
+const double TICKS_PER_CM = 4.098; //the amount of turns of the rotary encoder per cm of the string pulled
 
 
 int minValue = MAX_VALUE; //Variable that keeps track of the most recent minimum counter value, and the time at which it were hit.
