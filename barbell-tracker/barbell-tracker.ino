@@ -27,7 +27,7 @@ LiquidCrystal lcd(12, 11, 5, 4, 9, 10);
  */
 
 
-bool debugging = true;
+bool debugging = false;
 int printCnt = 0;
 
 const int MAX_VALUE = 32767; //max integer value
@@ -237,10 +237,10 @@ void calculateVelocity()
     if(debugging) Serial.println("]");
     
     double avgVelocity = total / cnt;
-    Serial.print("Rep complete. Avg velocity = ");
+    Serial.print("Avg velocity = ");
     Serial.print(avgVelocity);
-    Serial.print(" (m/s)");
-    Serial.print(",\t Peak Velocity: ");
+    Serial.println(" (m/s)");
+    Serial.print("Peak Velocity: ");
     Serial.print(maxVelocity);
     Serial.println(" (m/s)");
 
