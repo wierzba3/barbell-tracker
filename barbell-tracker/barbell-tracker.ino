@@ -45,6 +45,7 @@ int lastCounter = 0; //the previous counter value at which a time was recorded
 vector<long> timeSteps; //A list of time values taken every <counterInterval> counter steps
 vector<double> avgVelocityValues;
 vector<double> maxVelocityValues;
+vector<double> maxAccelerationValues;
 
 bool stringRetracting = true; //true if the string is retracting (the lifter is in the concentric phase of the exercise)
 bool stringPulling = false; //true if the string is being pulled (the lifter is in the eccentric phase of the exercise)
@@ -210,27 +211,37 @@ void calculateVelocity()
     Serial.print(repCounter);
     Serial.println(":");
 
-    double total = 0, maxVelocity = 0;
-    long prev = timeSteps[0];
+    double total = 0, maxVelocity = 0, maxAcceleration = 0;
+    double prevVelocity = -1;
+    long prevTime = timeSteps[0];
     int cnt = 0;
 
     if(debugging) Serial.print("micros values: [");
+    //declare variables used in loop
+    double dt, dt_sec, stepsPerSec, metersPerSec, acceleration;
     for(int i = 1; i < timeSteps.size(); i++)
     {
-      double dt = timeSteps[i] - prev;
+      dt = timeSteps[i] - prevTime;
+      dt_sec = 1000000.0 / dt;
       if(dt == 0) continue;
-      double stepsPerSec = counterInterval * 1000000.0 / dt;
-      double metersPerSec = (stepsPerSec / TICKS_PER_CM) / 100.0;
+      stepsPerSec = counterInterval * dt_sec;
+      metersPerSec = (stepsPerSec / TICKS_PER_CM) / 100.0;
 
       //if we are at last portion of the lift, and we see a very small velocity, truncate the rest of the values (we assume the lifter finished and re-racked the weight)
       if(i >= rerackIndex && metersPerSec < minVelocity) break;
       
-      prev = timeSteps[i];
+      prevTime = timeSteps[i];
       total += metersPerSec;
-      
       if(metersPerSec > maxVelocity) maxVelocity = metersPerSec;
-      cnt++;
 
+      if(prevVelocity > 0)
+      {
+        acceleration = (metersPerSec - prevVelocity) / dt_sec;
+        if(acceleration > maxAcceleration) maxAcceleration = acceleration;
+      }
+
+      prevVelocity = metersPerSec;
+      cnt++;
       if(debugging) Serial.print(dt);
       if(debugging && (i != timeSteps.size()-1)) Serial.print(", ");
     }
@@ -243,6 +254,8 @@ void calculateVelocity()
     Serial.print("Peak Velocity: ");
     Serial.print(maxVelocity);
     Serial.println(" (m/s)");
+    Serial.print("Peak Acceleration: " );
+    Serial.println(" (m/s^2)");
 
     //if this is the first rep, clear the initial start message
     if(repCounter == 1) 
@@ -261,7 +274,7 @@ void calculateVelocity()
     
     avgVelocityValues.push_back(avgVelocity);
     maxVelocityValues.push_back(maxVelocity);
-    
+    maxAccelerationValues.push_back(maxAcceleration);
   }
   else if(debugging) Serial.println("calculateVelocity() called but there were no timesteps");
 
