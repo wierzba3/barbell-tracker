@@ -27,13 +27,13 @@ LiquidCrystal lcd(12, 11, 5, 4, 9, 10);
  */
 
 
-bool debugging = false;
+bool debugging = true;
 int printCnt = 0;
 
 const int MAX_VALUE = 32767; //max integer value
 const int MIN_VALUE = -32768; //min integer value
 int repCounter = 0;
-const double TICKS_PER_CM = 4.098; //the amount of turns of the rotary encoder per cm of the string pulled
+const double STEPS_PER_CM = 4.098; //the amount of turns of the rotary encoder per cm of the string pulled
 
 
 int minValue = MAX_VALUE; //Variable that keeps track of the most recent minimum counter value, and the time at which it were hit.
@@ -54,7 +54,7 @@ int8_t encoderStep; //holds the temporary value read from the quadrature encoder
 
 //settings: (create a way to modify these variables via user-input in the future)
 long repEndWaitTime = 5 * 1000000; //the amount of time to wait at the top of the rep with no activity to count it as a rep complete (in micros)
-int minDistance = 5 * TICKS_PER_CM; //the minimum amount of cm the string must move in the opposite direction to be determined as switched direction
+int minDistance = 5 * STEPS_PER_CM; //the minimum amount of cm the string must move in the opposite direction to be determined as switched direction
 int counterInterval = 5; //the value at which each time sample is taken. 1cm ~= 4.098 counts
 //A distance from the end (in ticks) of the range of motion. All velocity values are scanned...
 int reRackDistance = 120; //...if a velocity value is found that is less than <minVelocity>, all subsequent values are truncated
@@ -216,16 +216,28 @@ void calculateVelocity()
     long prevTime = timeSteps[0];
     int cnt = 0;
 
-    if(debugging) Serial.print("micros values: [");
+    if(debugging) Serial.print("values: [");
     //declare variables used in loop
     double dt, dt_sec, stepsPerSec, metersPerSec, acceleration;
     for(int i = 1; i < timeSteps.size(); i++)
     {
       dt = timeSteps[i] - prevTime;
-      dt_sec = 1000000.0 / dt;
-      if(dt == 0) continue;
-      stepsPerSec = counterInterval * dt_sec;
-      metersPerSec = (stepsPerSec / TICKS_PER_CM) / 100.0;
+      dt_sec = dt / 1000000.0;
+      if(dt_sec == 0) continue;
+      stepsPerSec = counterInterval / dt_sec;
+      metersPerSec = (stepsPerSec / STEPS_PER_CM) / 100.0;
+
+//      if(debugging)
+//      {
+//        Serial.print("dt=");
+//        Serial.print(dt);
+//        Serial.print("/dt_sec=");
+//        Serial.print(dt_sec);
+//        Serial.print("/stepsPerSec=");
+//        Serial.print(stepsPerSec);
+//        Serial.print("/metersPerSec=");
+//        Serial.print(metersPerSec);
+//      }
 
       //if we are at last portion of the lift, and we see a very small velocity, truncate the rest of the values (we assume the lifter finished and re-racked the weight)
       if(i >= rerackIndex && metersPerSec < minVelocity) break;
@@ -234,15 +246,27 @@ void calculateVelocity()
       total += metersPerSec;
       if(metersPerSec > maxVelocity) maxVelocity = metersPerSec;
 
+
       if(prevVelocity > 0)
       {
         acceleration = (metersPerSec - prevVelocity) / dt_sec;
         if(acceleration > maxAcceleration) maxAcceleration = acceleration;
+        if(debugging)
+        {
+          Serial.print("metersPerSec=");
+          Serial.print(metersPerSec);
+          Serial.print("/prevVelocity=");
+          Serial.print(prevVelocity);
+          Serial.print("/dt_sec=");
+          Serial.print(dt_sec);
+          Serial.print("/acceleration=");
+          Serial.print(acceleration);
+        }
       }
 
       prevVelocity = metersPerSec;
       cnt++;
-      if(debugging) Serial.print(dt);
+
       if(debugging && (i != timeSteps.size()-1)) Serial.print(", ");
     }
     if(debugging) Serial.println("]");
@@ -255,6 +279,7 @@ void calculateVelocity()
     Serial.print(maxVelocity);
     Serial.println(" (m/s)");
     Serial.print("Peak Acceleration: " );
+    Serial.print(maxAcceleration);
     Serial.println(" (m/s^2)");
 
     //if this is the first rep, clear the initial start message
